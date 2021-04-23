@@ -10,6 +10,10 @@ execution_path = os.getcwd()
 # initialize camera
 camera = cv2.VideoCapture(0)
 
+# set frame height and width
+camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 1024)
+
 video_detector = VideoObjectDetection()
 video_detector.setModelTypeAsYOLOv3()
 video_detector.setModelPath(os.path.join(execution_path, "yolo.h5"))
@@ -28,9 +32,11 @@ start_time = 0
 valid_time = 5.0
 
 # initialize arduino communication
-arduino = serial.Serial(port='COM4', baudrate=9600, timeout=.1)
+#arduino = serial.Serial(port='COM4', baudrate=9600, timeout=.1)
 
 def forFrame(frame_number, output_array, output_count, returned_frame):
+
+    print ('detecting')
 
     global car_present
     global valid_time
@@ -38,7 +44,21 @@ def forFrame(frame_number, output_array, output_count, returned_frame):
 
     # get frame size
     height, width, n = returned_frame.shape
+
+    # get screen half size
     half_size = int(width/2)
+
+    # set horizontal line y position
+    y_coord = int(height * 0.25)
+
+    # line color
+    line_color = (0, 255, 255)
+
+    # draw vertical line in the middle
+    cv2.line(returned_frame, (half_size, 0), (half_size, height), line_color)
+
+    # draw horizontal line
+    cv2.line(returned_frame, (0, y_coord), (width, y_coord), line_color)
 
     # save frame 
     cv2.imwrite('car-frame.jpg', returned_frame)
@@ -50,8 +70,9 @@ def forFrame(frame_number, output_array, output_count, returned_frame):
     for eachCar in output_array:
         # get the points of the bounding box of the detected object
         x1, y1, x2, y2 = eachCar['box_points']
-
-        if x1 < half_size and x2 < half_size:
+        
+        # check if the object is within the bounds of the 'No Parking' area
+        if x1 < half_size and x2 < half_size and y1 > y_coord:
             car_count += 1
 
     if car_count != 0 and car_present:
@@ -59,14 +80,14 @@ def forFrame(frame_number, output_array, output_count, returned_frame):
         elapsed_time = end_time - start_time
         if elapsed_time > valid_time:
             print('Message sent')
-            arduino.write(bytes('1', 'utf-8'))
+            #arduino.write(bytes('1', 'utf-8'))
     elif car_count != 0 and not(car_present):
         start_time = timer()
         car_present = True
     else:
         start_time = 0
         car_present = False
-        arduino.write(bytes('0', 'utf-8'))
+        #arduino.write(bytes('0', 'utf-8'))
 
 # initialize video object detection
 video_detector.detectObjectsFromVideo(camera_input=camera, 
